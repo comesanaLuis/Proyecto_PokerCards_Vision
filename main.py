@@ -47,7 +47,7 @@ def main(args):
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_height)
 
         #Modelo YOLOv8 de predición entrenado
-        model = YOLO("YOLO_PokerCards_Vision.pt") #hay que sustituirlo por el entrenado (Se podría enrutar el directorio de predict y train)
+        model = YOLO("YOLO_PokerCards_Vision_Final.pt")
 
         #Definicion de propiedades Enmarcador de objetos detectados
         box_annotator = sv.BoxAnnotator(
