@@ -3,58 +3,55 @@ val: ../valid/images
 
 # Classes
 names:
-  0: 10C
-  1: 10D
-  2: 10H
-  3: 10S
-  4: 2C
-  5: 2D
-  6: 2H
-  7: 2S
-  8: 3C
-  9: 3D
-  10: 3H
-  11: 3S
-  12: 4C
-  13: 4D
-  14: 4H
-  15: 4S
-  16: 5C
-  17: 5D
-  18: 5H
-  19: 5S
-  20: 6C
-  21: 6D
-  22: 6H
-  23: 6S
-  24: 7C
-  25: 7D
-  26: 7H
-  27: 7S
-  28: 8C
-  29: 8D
-  30: 8H
-  31: 8S
-  32: 9C
-  33: 9D
-  34: 9H
-  35: 9S
-  36: 10C
-  37: 10D
-  38: 10H
-  39: ACS
-  40: AD
-  41: AH
-  42: AS
-  43: JC
-  44: JD
-  45: JH
-  46: JS
-  47: KC
-  48: KD
-  49: KH
-  50: KS
-  51: QC
-  52: QD
-  53: QH
-  54: QS
+  0: 10 Trevoles
+  1: 10 Diamantes
+  2: 10 Corazones
+  3: 10 Picas
+  4: 2 Trevoles
+  5: 2 Diamantes
+  6: 2 Corazones
+  7: 2 Picas
+  8: 3 Trevoles
+  9: 3 Diamantes
+  10: 3 Corazones
+  11: 3 Picas
+  12: 4 Trevoles
+  13: 4 Diamantes
+  14: 4 Corazones
+  15: 4 Picas
+  16: 5 Trevoles
+  17: 5 Diamantes
+  18: 5 Corazones
+  19: 5 Picas
+  20: 6 Trevoles
+  21: 6 Diamantes
+  22: 6 Corazones
+  23: 6 Picas
+  24: 7 Trevoles
+  25: 7 Diamantes
+  26: 7 Corazones
+  27: 7 Picas
+  28: 8 Trevoles
+  29: 8 Diamantes
+  30: 8 Corazones
+  31: 8 Picas
+  32: 9 Trevoles
+  33: 9 Diamantes
+  34: 9 Corazones
+  35: 9 Picas
+  36: As Trevoles
+  37: As Diamantes
+  38: As Corazones
+  39: As Picas
+  40: J Trevoles
+  41: J Diamantes
+  42: J Corazones
+  43: J Picas
+  44: K Trevoles
+  45: K Diamantes
+  46: K Corazones
+  47: K Picas
+  48: Q Trevoles
+  49: Q Diamantes
+  50: Q Corazones
+  51: Q Picas
