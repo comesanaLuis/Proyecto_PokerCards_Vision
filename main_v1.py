@@ -2,8 +2,8 @@
 import cv2
 import argparse
 from ultralytics import YOLO
+from ultralytics import data
 import supervision as sv
-
 
 #Definicion de argumentos
 def parse_arguments() -> argparse.Namespace:
@@ -19,18 +19,16 @@ def parse_arguments() -> argparse.Namespace:
     args = parser.parse_args()
     return args
 
-
 #Programa Principal
 def main(args):
     #Definicion de tarea "train" (entrenamiento)
     if args.train:
-        model = YOLO("yolov8n.pt") 
-
-        results = model.train(data='data.yaml', epochs=2, imgsz=640)
+        model = YOLO("YOLO_PokerCards_Vision_Final.pt") 
+        results = model.train(data='YOLO_PokerCards_Vision.yaml', epochs=20, imgsz=640)
 
     #Definicion de tarea "valid" (validacion)
     elif args.valid:
-        model = YOLO('best.pt')  # load an official model
+        model = YOLO('YOLO_PokerCards_Vision.yaml')  # load an official model
         # Validate the modelz
         metrics = model.val()  # no arguments needed, dataset and settings remembered
         metrics.box.map    # map50-95
@@ -41,11 +39,11 @@ def main(args):
     #Definicion de tarea "predict" (prediccion) (PREDETERMINADO)
     else:
         #Definicion de VideoInput
-        cap = cv2.VideoCapture(0)
+        cap = cv2.VideoCapture(4)
         frame_width, frame_height = args.webcam_resoution
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, frame_width)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_height)
-
+ 
         #Modelo YOLOv8 de predición entrenado
         model = YOLO("YOLO_PokerCards_Vision_Final.pt")
 
@@ -58,9 +56,12 @@ def main(args):
         
         while True:
             ret, frame = cap.read() #Se extrae frame
-            result = model(frame)[0] #Se predice objetos del frame
+            result = model(frame, agnostic_nms = False)[0] #Se predice objetos del frame
 
             detections = sv.Detections.from_ultralytics(result) #Se extraen a variables atributos de cada objeto detectado
+            print(detections.class_id)
+            numero = list(set(detections.class_id))
+            print(str(numero))
 
             #Definicion de cada una de las etiquetas a mostrar en box_annotator
             labels = [
@@ -71,7 +72,7 @@ def main(args):
             #Se imprimen en el Video output los objetos detectados mediante su encuadre y etiqueta
             frame = box_annotator.annotate(scene=frame, detections=detections, labels=labels)
 
-            cv2.imshow("YOLO_PokerCards_Vision", frame) #Se muestra VideoOutput
+            cv2.imshow("YOLO_PokerCards_Vision0", frame) #Se muestra VideoOutput
     
             if (cv2.waitKey(30) == 27):#Si se presiona ESC, se sale de la ventana
                 break
