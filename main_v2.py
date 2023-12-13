@@ -83,7 +83,7 @@ class Jugador:
             self.points = [(645,100), (775,100), (905,100), (1035,100), (1165,100)]
             self.textPoint = ((645,300))
         else:
-            self.name = input("Dime el nombre del jugador: ")
+            self.name = input("\nDime el nombre del jugador: ")
             if Jugador.NumeroJugadores == 2:
                 self.points = [(145,500), (275,500)]
                 self.textPoint = ((145,450))
@@ -92,7 +92,7 @@ class Jugador:
                 self.textPoint = ((1545,450))
             if Jugador.NumeroJugadores == 4:
                 self.points = [(840,700), (965,700)]
-                self.textPoint = ((1545,650))
+                self.textPoint = ((840,650))
             
 
         self.video = cv2.VideoCapture(SeleccionCamara(self.name))
@@ -107,7 +107,7 @@ class Jugador:
         return frame
     
     def result(self, frame):
-        return self.model(frame)[0]
+        return self.model(frame, agnostic_nms = True)[0]
 
 class Diccionario:
     with open('YOLO_PokerCards_Vision.yaml', 'r') as file:
@@ -157,12 +157,9 @@ def main(args):
         for num_players in range(Jugador.NumeroJugadores):
             frame = players[num_players].leer_frame()
             result = players[num_players].result(frame)
-            #result = players[num_players].result(frame, agnostic_nms = True)
             detections = sv.Detections.from_ultralytics(result)
             draw = ImageDraw.Draw(CopyPokerTable)
             draw.text(players[num_players].textPoint, players[num_players].name, font=ImageFont.truetype("calibrib.ttf", 50), fill=(0, 0, 0))
-            print(detections.class_id)
-            print(list(set(detections.class_id)))
             
             for i, class_id in enumerate(list(set(detections.class_id))):
                 try:
