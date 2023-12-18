@@ -9,7 +9,7 @@ import yaml
 import pied_poker as pp
 from multiprocessing import Process, Pipe
 
-#Definicion de argumentos
+#Definicion de los argumentos principales
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="YOLO_PokerCards_Vision")
     parser.add_argument("--train", action='store_true')
@@ -23,6 +23,7 @@ def parse_arguments() -> argparse.Namespace:
     args = parser.parse_args()
     return args
 
+#Definicion de la funcion que pregunta el numero de jugadores de la partida
 def NumeroJugadores():
     players = None
     try:
@@ -36,6 +37,7 @@ def NumeroJugadores():
         players = NumeroJugadores()
     return players
 
+#Definicion de la funcion que lista las camaras y se asigna una para asociarla a un jugador
 def SeleccionCamara(playerName):
     camara_index = 0
     while True:
@@ -75,7 +77,9 @@ def SeleccionCamara(playerName):
             print("El dato introducido no es correcto, introduce un numero REAL")
 
     return CamaraFinal
-    
+
+#Definicion de la clase Jugador, en ella se recogen las variables principales como nombre del jugador, camara asociada,
+#puntos donde visualizar las cartas y texto en la mesa y modelo de prediccion
 class Jugador:
     NumeroJugadores = 0
     def __init__(self, video_param, croupier = None):
@@ -98,10 +102,9 @@ class Jugador:
                 self.points = [(740,700), (865,700)]
                 self.textNamePoint = ((740,650))
                 self.textPoint = ((740,500))
-            
 
         self.video = cv2.VideoCapture(SeleccionCamara(self.name))
-        self.model = YOLO("YOLO_PokerCards_Vision_Final.pt") #Modelo YOLOv8 de predición entrenado
+        self.model = YOLO("YOLO_PokerCards_Vision_Final.pt")
 
         frame_width, frame_height = video_param
         self.video.set(cv2.CAP_PROP_FRAME_WIDTH, frame_width)
@@ -114,6 +117,8 @@ class Jugador:
     def result(self, frame):
         return self.model(frame, agnostic_nms = True)[0]
 
+#Definicion de la clase diccionario, su funcion es precargar todas las imagenes de las cartas de la baraja 
+#para luego mostar la carta en la mesa cuando un modelo detecta una carta
 class Diccionario:
     with open('YOLO_PokerCards_Vision.yaml', 'r') as file:
         data = yaml.safe_load(file)
@@ -125,6 +130,8 @@ class Diccionario:
         cartas[carta_nombre] = Image.open(carta_ruta)
         cartas[carta_nombre] = cartas[carta_nombre].resize((cartas[carta_nombre].size[0] // 6, cartas[carta_nombre].size[1] // 6))
 
+#Definicion de la funcion que traduce la variable de entrada correspondiente a una etiqueta del modelo de predicion a otra etiqueta 
+#con otro nombre para posteriormente calcular en otra funcion la mano mas fuete y la probabilidad de ganar a futuro
 def traduccion(cartas):
     diccionario_poker = {
         '10 Trevoles': '10C', '10 Diamantes': '10D', '10 Corazones': '10H', '10 Picas': '10S',
@@ -141,14 +148,12 @@ def traduccion(cartas):
         'K Trevoles': 'KC', 'K Diamantes': 'KD', 'K Corazones': 'KH', 'K Picas': 'KS',
         'Q Trevoles': 'QC', 'Q Diamantes': 'QD', 'Q Corazones': 'QH', 'Q Picas': 'QS'
     }
-
-    # Traducir las cartas usando el diccionario
     cartas_traducidas = [diccionario_poker[carta] for carta in cartas]
-
     return cartas_traducidas
 
-
+#Definicion de la funcion que calcula la mano mas fuete actual de los jugadores de la mesa
 def manoGanadora(ArrayCartasJugadores, CartasComunitarias):
+    #Definicion del diccionario manos para traducir de ingles a castellano las manos ganadoras
     diccionario_manos = {
         "HighCard": "Carta Alta",
         "OnePair": "Una Pareja",
@@ -161,7 +166,6 @@ def manoGanadora(ArrayCartasJugadores, CartasComunitarias):
         "StraightFlush": "Escalera de Color",
         "RoyalFlush": "Escalera Real",
     }
-
     players = []
     players_info = pp.PokerRoundResult(ArrayCartasJugadores, CartasComunitarias).players_ranked
     for p in players_info:
@@ -169,9 +173,9 @@ def manoGanadora(ArrayCartasJugadores, CartasComunitarias):
         players.append((p.name, diccionario_manos.get(mano[0]), mano[1][:-1]))
     return players
 
+#Definicion de la funcion que calcula mediante simulacion la probabilidad de ganar a futuro de cada uno de los jugadores de la mesa
 def probGanador(conn, ArrayCartasJugadores, CartasComunitarias):
     simulation_result = pp.PokerRoundSimulator(CartasComunitarias, ArrayCartasJugadores, len(ArrayCartasJugadores)).simulate(10000, n_jobs=1)
-
     players = sorted(simulation_result.__rounds__[0].players_ranked, key=lambda p: p.name)
     player_win_probabilities = []
 
@@ -184,29 +188,29 @@ def probGanador(conn, ArrayCartasJugadores, CartasComunitarias):
 
 #Programa Principal
 def main(args):
-    #Definicion de tarea "train" (entrenamiento)
+    #Definicion de la tarea "train" (entrenamiento)
     if args.train:
         model = YOLO("YOLO_PokerCards_Vision_Final.pt") 
         results = model.train(data='YOLO_PokerCards_Vision.yaml', epochs=20, imgsz=640)
 
-    #Definicion de tarea "valid" (validacion)
+    #Definicion de la tarea "valid" (validacion)
     elif args.valid:
-        model = YOLO('YOLO_PokerCards_Vision.yaml')  # load an official model
-        # Validate the modelz
-        metrics = model.val()  # no arguments needed, dataset and settings remembered
-        metrics.box.map    # map50-95
-        metrics.box.map50  # map50
-        metrics.box.map75  # map75
-        metrics.box.maps   # a list contains map50-95 of each category
+        model = YOLO('YOLO_PokerCards_Vision.yaml')
+        metrics = model.val()
+        metrics.box.map
+        metrics.box.map50
+        metrics.box.map75
+        metrics.box.maps
 
-    #Definicion de tarea "predict" (prediccion) (PREDETERMINADO)
+    #Definicion de la tarea "predict" (prediccion) (PREDETERMINADO)
     else:
         players = []
         players.append(Jugador(args.webcam_resolution, croupier=True))
         num_players = NumeroJugadores()
         for _ in range(num_players):
             players.append(Jugador(args.webcam_resolution))
-        
+
+    #Inicializacion de las variables y funciones de primera ejecucion  
     miDiccionario = Diccionario()
     PokerTable = Image.open('PokerTable.jpg')
     cv2.namedWindow('Mesa', cv2.WINDOW_NORMAL)
@@ -215,55 +219,54 @@ def main(args):
     prob = None
     manos = []
 
+    #Definicion del bucle de prediccion
     while True:
-        CopyPokerTable = PokerTable.copy()
-        players_result = []
+        CopyPokerTable = PokerTable.copy() #Se carga una copia de la imagen de la mesa de poker original (Reinicializa una mesa vacia)
+        players_result = [] #Se inicializa la variable resultados (Reinicializa(vacia) la variable)
 
-        for num_players in range(Jugador.NumeroJugadores):
-            frame = players[num_players].leer_frame()
-            result = players[num_players].result(frame)
-            detections = sv.Detections.from_ultralytics(result)
+        for num_players in range(Jugador.NumeroJugadores): #Bucle for para para predecir las cartas y mostrarlas en la mesa para cada jugador
+            frame = players[num_players].leer_frame() #Se obtiene el frame en t instante de la camara del jugador
+            result = players[num_players].result(frame) #Se predice las posibles cartas
+            detections = sv.Detections.from_ultralytics(result) #Se extrae la informacion del resultado de prediccion
             
-            draw = ImageDraw.Draw(CopyPokerTable)
+            draw = ImageDraw.Draw(CopyPokerTable) #Se inicializa el metodo draw sobre la copia de la mesa
+            # Se escibe el nombre del jugador sobre la mesa
             draw.text(players[num_players].textNamePoint, players[num_players].name, font=ImageFont.truetype("calibrib.ttf", 50), fill=(0, 0, 0))
 
-            #Se muestran las cartas en la mesa
+            #Se muestran las cartas en la posicion del jugador en la mesa
             cartas = []
-            for i, class_id in enumerate(list(set(detections.class_id))):
+            for i, class_id in enumerate(list(set(detections.class_id))): #list(set())) se desechan cartas duplicadas (sobles puntos de deteccion)
                 try:
+                    #Se pega cada carta del jugador en su posicion correspondiente
                     CopyPokerTable.paste(miDiccionario.cartas[players[num_players].model.model.names[class_id]], players[num_players].points[i])
+                    #Se guarda cada carta en el array cartas
                     cartas.append(players[num_players].model.model.names[class_id])
                 except:
-                    print("MISSED")
+                    print("MISSED") #Si por un casual se detectan mas de 2 cartas, se desechan el resto
                     pass
-            players_result.append((players[num_players].name, cartas, len(cartas)))
-        
+            players_result.append((players[num_players].name, cartas, len(cartas))) #Se almacena en el array player_result el nombre y las cartas de cada jugador
 
-        #players_result.append(('Croupier', ['4 Trevoles', '8 Corazones', 'As Corazones', '2 Picas'], 4))
-        #players_result.append(('Tom', ['3 Trevoles', '5 Diamantes'], 2))
-        #players_result.append(('Masa', ['8 Trevoles', '8 Picas'], 2))
-        #players_result.append(('Andre', ['10 Corazones', '9 Corazones'], 2))
-
+        #Si todos los jugadores (excluyendo el Crupier) tiene 2 cartas, se analiza las manos mas fuertes y se predice la probabilidad de ganar a futuro
         if all(num_cards == 2 for _, _, num_cards in players_result[1:]):
             pp_players = []
             try:
                 for player in players_result[1:]:
-                    pp_players.append(pp.Player(player[0], pp.Card.of(*traduccion(player[1]))))
-                manos = manoGanadora(pp_players, pp.Card.of(*traduccion(players_result[0][1])))
+                    pp_players.append(pp.Player(player[0], pp.Card.of(*traduccion(player[1])))) #Se inicializa jugador y su mano correspondiente
+                manos = manoGanadora(pp_players, pp.Card.of(*traduccion(players_result[0][1]))) #Se obtiene los pesos de las manos
                 if simulacion_process == None or not simulacion_process.is_alive():
-                    parent_conn, child_conn = Pipe()
-                    simulacion_process = Process(target=probGanador, args=(child_conn, pp_players, pp.Card.of(*traduccion(players_result[0][1]))))
-                    simulacion_process.start()
+                    parent_conn, child_conn = Pipe() #Se define variables para comunicacion multiproceso
+                    simulacion_process = Process(target=probGanador, args=(child_conn, pp_players, pp.Card.of(*traduccion(players_result[0][1])))) # Definicion multriproceso
+                    simulacion_process.start() #Se inicia multiproceso (Calcula la probabilidad de los jugadores a ganar a futuro)
             except:
                 print("No se ha podido calcular las manos o la probabilidad de ganar")
         
         try:
             if parent_conn.poll():
-                prob = parent_conn.recv()
+                prob = parent_conn.recv()#Recupera la informacion de la cola del multiproceso
         except:
             print("No hay cola inicializada")
 
-        player_info = []
+        #Se escribe todos los resultados en la imagen de la mesa
         for num_players in range(Jugador.NumeroJugadores):
             if len(manos) != 0:
                 datos1 = next(((categoria_mano, rango_mano) for nombre, categoria_mano, rango_mano in manos if nombre == players[num_players].name), ('', ''))
@@ -284,11 +287,12 @@ def main(args):
                     text = ''
                 draw.text(players[num_players].textPoint, text, font=ImageFont.truetype("ariblk.ttf", 25), fill=(0, 0, 0))
         
+        #Se muestra la imagen de la mesa con toda la informacion(Nombre de jugadores, cartas detectadas, manos ganadoras, probabilidades ....)
         cv2.imshow("Mesa", cv2.cvtColor(np.array(CopyPokerTable), cv2.COLOR_RGB2BGR))
 
-        if (cv2.waitKey(30) == 27):
+        if (cv2.waitKey(30) == 27): #Si se presiona ESC, se sale de la ventana
             simulacion_process.kill()
-            break #Si se presiona ESC, se sale de la ventana
+            break 
 
 #Init definition
 if __name__ == "__main__":
