@@ -56,7 +56,7 @@ def main(args):
         
         while True:
             ret, frame = cap.read() #Se extrae frame
-            result = model(frame, agnostic_nms = False)[0] #Se predice objetos del frame
+            result = model(frame, agnostic_nms = True)[0] #Se predice objetos del frame
 
             detections = sv.Detections.from_ultralytics(result) #Se extraen a variables atributos de cada objeto detectado
             print(detections.class_id)
