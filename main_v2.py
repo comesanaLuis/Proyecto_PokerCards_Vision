@@ -146,31 +146,31 @@ def main(args):
         for _ in range(num_players):
             players.append(Jugador(args.webcam_resolution))
         
-    miDiccionario = Diccionario()
-    PokerTable = Image.open('PokerTable.jpg')
-    cv2.namedWindow('Mesa', cv2.WINDOW_NORMAL)
-    cv2.resizeWindow("Mesa", args.webcam_resolution)
+        miDiccionario = Diccionario()
+        PokerTable = Image.open('PokerTable.jpg')
+        cv2.namedWindow('Mesa', cv2.WINDOW_NORMAL)
+        cv2.resizeWindow("Mesa", args.webcam_resolution)
 
-    while True:
-        CopyPokerTable = PokerTable.copy()
+        while True:
+            CopyPokerTable = PokerTable.copy()
 
-        for num_players in range(Jugador.NumeroJugadores):
-            frame = players[num_players].leer_frame()
-            result = players[num_players].result(frame)
-            detections = sv.Detections.from_ultralytics(result)
-            draw = ImageDraw.Draw(CopyPokerTable)
-            draw.text(players[num_players].textPoint, players[num_players].name, font=ImageFont.truetype("calibrib.ttf", 50), fill=(0, 0, 0))
-            
-            for i, class_id in enumerate(list(set(detections.class_id))):
-                try:
-                    CopyPokerTable.paste(miDiccionario.cartas[players[num_players].model.model.names[class_id]], players[num_players].points[i])
-                except:
-                    print("MISSED")
-                    pass
-            
-        cv2.imshow("Mesa", cv2.cvtColor(np.array(CopyPokerTable), cv2.COLOR_RGB2BGR))
+            for num_players in range(Jugador.NumeroJugadores):
+                frame = players[num_players].leer_frame()
+                result = players[num_players].result(frame)
+                detections = sv.Detections.from_ultralytics(result)
+                draw = ImageDraw.Draw(CopyPokerTable)
+                draw.text(players[num_players].textPoint, players[num_players].name, font=ImageFont.truetype("calibrib.ttf", 50), fill=(0, 0, 0))
+                
+                for i, class_id in enumerate(list(set(detections.class_id))):
+                    try:
+                        CopyPokerTable.paste(miDiccionario.cartas[players[num_players].model.model.names[class_id]], players[num_players].points[i])
+                    except:
+                        print("MISSED")
+                        pass
+                
+            cv2.imshow("Mesa", cv2.cvtColor(np.array(CopyPokerTable), cv2.COLOR_RGB2BGR))
 
-        if (cv2.waitKey(30) == 27): break #Si se presiona ESC, se sale de la ventana
+            if (cv2.waitKey(30) == 27): break #Si se presiona ESC, se sale de la ventana
 
 #Init definition
 if __name__ == "__main__":

@@ -176,6 +176,7 @@ def manoGanadora(ArrayCartasJugadores, CartasComunitarias):
 #Definicion de la funcion que calcula mediante simulacion la probabilidad de ganar a futuro de cada uno de los jugadores de la mesa
 def probGanador(conn, ArrayCartasJugadores, CartasComunitarias):
     simulation_result = pp.PokerRoundSimulator(CartasComunitarias, ArrayCartasJugadores, len(ArrayCartasJugadores)).simulate(10000, n_jobs=1)
+
     players = sorted(simulation_result.__rounds__[0].players_ranked, key=lambda p: p.name)
     player_win_probabilities = []
 
@@ -204,95 +205,96 @@ def main(args):
 
     #Definicion de la tarea "predict" (prediccion) (PREDETERMINADO)
     else:
+        #Inicializacion de jugadores, camaras, variables y funciones de primera ejecucion  
         players = []
         players.append(Jugador(args.webcam_resolution, croupier=True))
         num_players = NumeroJugadores()
         for _ in range(num_players):
             players.append(Jugador(args.webcam_resolution))
+ 
+        miDiccionario = Diccionario()
+        PokerTable = Image.open('PokerTable.jpg')
+        cv2.namedWindow('Mesa', cv2.WINDOW_NORMAL)
+        cv2.resizeWindow("Mesa", args.webcam_resolution)
+        simulacion_process = None
+        prob = None
+        manos = []
 
-    #Inicializacion de las variables y funciones de primera ejecucion  
-    miDiccionario = Diccionario()
-    PokerTable = Image.open('PokerTable.jpg')
-    cv2.namedWindow('Mesa', cv2.WINDOW_NORMAL)
-    cv2.resizeWindow("Mesa", args.webcam_resolution)
-    simulacion_process = None
-    prob = None
-    manos = []
+        #Definicion del bucle de prediccion
+        while True:
+            CopyPokerTable = PokerTable.copy() #Se carga una copia de la imagen de la mesa de poker original (Reinicializa una mesa vacia)
+            players_result = [] #Se inicializa la variable resultados (Reinicializa(vacia) la variable)
 
-    #Definicion del bucle de prediccion
-    while True:
-        CopyPokerTable = PokerTable.copy() #Se carga una copia de la imagen de la mesa de poker original (Reinicializa una mesa vacia)
-        players_result = [] #Se inicializa la variable resultados (Reinicializa(vacia) la variable)
+            for num_players in range(Jugador.NumeroJugadores): #Bucle for para para predecir las cartas y mostrarlas en la mesa para cada jugador
+                frame = players[num_players].leer_frame() #Se obtiene el frame en t instante de la camara del jugador
+                result = players[num_players].result(frame) #Se predice las posibles cartas
+                detections = sv.Detections.from_ultralytics(result) #Se extrae la informacion del resultado de prediccion
+                
+                draw = ImageDraw.Draw(CopyPokerTable) #Se inicializa el metodo draw sobre la copia de la mesa
+                # Se escibe el nombre del jugador sobre la mesa
+                draw.text(players[num_players].textNamePoint, players[num_players].name, font=ImageFont.truetype("calibrib.ttf", 50), fill=(0, 0, 0))
 
-        for num_players in range(Jugador.NumeroJugadores): #Bucle for para para predecir las cartas y mostrarlas en la mesa para cada jugador
-            frame = players[num_players].leer_frame() #Se obtiene el frame en t instante de la camara del jugador
-            result = players[num_players].result(frame) #Se predice las posibles cartas
-            detections = sv.Detections.from_ultralytics(result) #Se extrae la informacion del resultado de prediccion
-            
-            draw = ImageDraw.Draw(CopyPokerTable) #Se inicializa el metodo draw sobre la copia de la mesa
-            # Se escibe el nombre del jugador sobre la mesa
-            draw.text(players[num_players].textNamePoint, players[num_players].name, font=ImageFont.truetype("calibrib.ttf", 50), fill=(0, 0, 0))
+                #Se muestran las cartas en la posicion del jugador en la mesa
+                cartas = []
+                for i, class_id in enumerate(list(set(detections.class_id))): #list(set())) se desechan cartas duplicadas (sobles puntos de deteccion)
+                    try:
+                        #Se pega cada carta del jugador en su posicion correspondiente
+                        CopyPokerTable.paste(miDiccionario.cartas[players[num_players].model.model.names[class_id]], players[num_players].points[i])
+                        #Se guarda cada carta en el array cartas
+                        cartas.append(players[num_players].model.model.names[class_id])
+                    except:
+                        print("MISSED") #Si por un casual se detectan mas de 2 cartas, se desechan el resto
+                        pass
+                players_result.append((players[num_players].name, cartas, len(cartas))) #Se almacena en el array el nombre y las cartas de cada jugador
 
-            #Se muestran las cartas en la posicion del jugador en la mesa
-            cartas = []
-            for i, class_id in enumerate(list(set(detections.class_id))): #list(set())) se desechan cartas duplicadas (sobles puntos de deteccion)
+            #Si todos los jugadores (excluyendo el Crupier) tiene 2 cartas, se analiza las manos mas fuertes y se predice la probabilidad de ganar a futuro
+            if all(num_cards == 2 for _, _, num_cards in players_result[1:]):
+                pp_players = []
                 try:
-                    #Se pega cada carta del jugador en su posicion correspondiente
-                    CopyPokerTable.paste(miDiccionario.cartas[players[num_players].model.model.names[class_id]], players[num_players].points[i])
-                    #Se guarda cada carta en el array cartas
-                    cartas.append(players[num_players].model.model.names[class_id])
+                    for player in players_result[1:]:
+                        pp_players.append(pp.Player(player[0], pp.Card.of(*traduccion(player[1])))) #Se inicializa jugador y su mano correspondiente
+                    manos = manoGanadora(pp_players, pp.Card.of(*traduccion(players_result[0][1]))) #Se obtiene los pesos de las manos
+                    if simulacion_process == None or not simulacion_process.is_alive():
+                        parent_conn, child_conn = Pipe() #Se define variables para comunicacion multiproceso
+                        # Definicion multriproceso
+                        simulacion_process = Process(target=probGanador, args=(child_conn, pp_players, pp.Card.of(*traduccion(players_result[0][1]))))
+                        simulacion_process.start() #Se inicia multiproceso (Calcula la probabilidad de los jugadores a ganar a futuro)
                 except:
-                    print("MISSED") #Si por un casual se detectan mas de 2 cartas, se desechan el resto
-                    pass
-            players_result.append((players[num_players].name, cartas, len(cartas))) #Se almacena en el array player_result el nombre y las cartas de cada jugador
-
-        #Si todos los jugadores (excluyendo el Crupier) tiene 2 cartas, se analiza las manos mas fuertes y se predice la probabilidad de ganar a futuro
-        if all(num_cards == 2 for _, _, num_cards in players_result[1:]):
-            pp_players = []
+                    print("No se ha podido calcular las manos o la probabilidad de ganar")
+            
             try:
-                for player in players_result[1:]:
-                    pp_players.append(pp.Player(player[0], pp.Card.of(*traduccion(player[1])))) #Se inicializa jugador y su mano correspondiente
-                manos = manoGanadora(pp_players, pp.Card.of(*traduccion(players_result[0][1]))) #Se obtiene los pesos de las manos
-                if simulacion_process == None or not simulacion_process.is_alive():
-                    parent_conn, child_conn = Pipe() #Se define variables para comunicacion multiproceso
-                    simulacion_process = Process(target=probGanador, args=(child_conn, pp_players, pp.Card.of(*traduccion(players_result[0][1])))) # Definicion multriproceso
-                    simulacion_process.start() #Se inicia multiproceso (Calcula la probabilidad de los jugadores a ganar a futuro)
+                if parent_conn.poll():
+                    prob = parent_conn.recv()#Recupera la informacion de la cola del multiproceso
             except:
-                print("No se ha podido calcular las manos o la probabilidad de ganar")
-        
-        try:
-            if parent_conn.poll():
-                prob = parent_conn.recv()#Recupera la informacion de la cola del multiproceso
-        except:
-            print("No hay cola inicializada")
+                print("No hay cola inicializada")
 
-        #Se escribe todos los resultados en la imagen de la mesa
-        for num_players in range(Jugador.NumeroJugadores):
-            if len(manos) != 0:
-                datos1 = next(((categoria_mano, rango_mano) for nombre, categoria_mano, rango_mano in manos if nombre == players[num_players].name), ('', ''))
-            else:
-                datos1 = {}
-            if prob:
-                datos2 = next((datos for n, datos in prob if n == players[num_players].name), {})
-            else:
-                datos2 = {}
+            #Se escribe todos los resultados en la imagen de la mesa
+            for num_players in range(Jugador.NumeroJugadores):
+                if len(manos) != 0:
+                    datos1 = next(((categoria_mano, rango_mano) for nombre, categoria_mano, rango_mano in manos if nombre == players[num_players].name), ('', ''))
+                else:
+                    datos1 = {}
+                if prob:
+                    datos2 = next((datos for n, datos in prob if n == players[num_players].name), {})
+                else:
+                    datos2 = {}
+                
+                ganador_nombre = manos[0][0] if manos else None
+                datos3 = "Ganador de la ronda actual" if ganador_nombre == players[num_players].name else ''
+
+                if num_players != 0:
+                    try:
+                        text = f'{datos3}\n% Ganar a futuro: {datos2}\nCombinacion: {datos1[1]}\nMano ganadora: {datos1[0]}'
+                    except:
+                        text = ''
+                    draw.text(players[num_players].textPoint, text, font=ImageFont.truetype("ariblk.ttf", 25), fill=(0, 0, 0))
             
-            ganador_nombre = manos[0][0] if manos else None
-            datos3 = "Ganador de la ronda actual" if ganador_nombre == players[num_players].name else ''
+            #Se muestra la imagen de la mesa con toda la informacion(Nombre de jugadores, cartas detectadas, manos ganadoras, probabilidades ....)
+            cv2.imshow("Mesa", cv2.cvtColor(np.array(CopyPokerTable), cv2.COLOR_RGB2BGR))
 
-            if num_players != 0:
-                try:
-                    text = f'{datos3}\n% Ganar a futuro: {datos2}\nCombinacion: {datos1[1]}\nMano ganadora: {datos1[0]}'
-                except:
-                    text = ''
-                draw.text(players[num_players].textPoint, text, font=ImageFont.truetype("ariblk.ttf", 25), fill=(0, 0, 0))
-        
-        #Se muestra la imagen de la mesa con toda la informacion(Nombre de jugadores, cartas detectadas, manos ganadoras, probabilidades ....)
-        cv2.imshow("Mesa", cv2.cvtColor(np.array(CopyPokerTable), cv2.COLOR_RGB2BGR))
-
-        if (cv2.waitKey(30) == 27): #Si se presiona ESC, se sale de la ventana
-            simulacion_process.kill()
-            break 
+            if (cv2.waitKey(30) == 27): #Si se presiona ESC, se sale de la ventana
+                simulacion_process.kill()
+                break 
 
 #Init definition
 if __name__ == "__main__":
